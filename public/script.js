@@ -1,5 +1,5 @@
 // ── Connect to Socket.IO server ──
-const socket = io();
+const socket = io({ transports: ["polling"] });
 
 // ── State ──
 let myUsername = "";
