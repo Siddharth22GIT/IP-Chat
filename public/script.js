@@ -27,6 +27,7 @@ const headerIp      = document.getElementById("header-ip");
 const headerUsername  = document.getElementById("header-username");
 const sidebarUsername = document.getElementById("sidebar-username");
 const userCount     = document.getElementById("user-count");
+const clearBtn      = document.getElementById("clear-btn");
 const menuToggle    = document.getElementById("menu-toggle");
 const sidebar       = document.querySelector(".sidebar");
 
