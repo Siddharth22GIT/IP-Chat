@@ -143,7 +143,12 @@ imageInput.addEventListener("change", () => {
   reader.readAsDataURL(file);
 });
 
-// ── TYPING INDICATOR ──
+// ── Timestamp helper — uses user's local time ──
+function getTimestamp() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+
 const typingIndicator = document.getElementById("typing-indicator");
 let typingTimeout = null;
 let isTyping = false;
@@ -234,11 +239,11 @@ document.addEventListener("click", (e) => {
 });
 
 // ── SOCKET EVENTS ──
-socket.on("receive_message", ({ username, message, timestamp, senderId }) => {
-  appendMessage({ username, message, timestamp, isSelf: senderId === socket.id });
+socket.on("receive_message", ({ username, message, senderId }) => {
+  appendMessage({ username, message, timestamp: getTimestamp(), isSelf: senderId === socket.id });
 });
-socket.on("receive_image", ({ username, imageData, timestamp, senderId }) => {
-  appendImage({ username, imageData, timestamp, isSelf: senderId === socket.id });
+socket.on("receive_image", ({ username, imageData, senderId }) => {
+  appendImage({ username, imageData, timestamp: getTimestamp(), isSelf: senderId === socket.id });
 });
 socket.on("user_joined", ({ message }) => appendSystemMessage(message));
 socket.on("user_left", ({ message }) => appendSystemMessage(message));

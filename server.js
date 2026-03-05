@@ -56,14 +56,9 @@ io.on("connection", (socket) => {
 
   // When a user sends an image
   socket.on("send_image", ({ imageData, room }) => {
-    const timestamp = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
     io.to(room).emit("receive_image", {
       username: socket.username,
       imageData,
-      timestamp,
       senderId: socket.id,
     });
   });
@@ -79,16 +74,9 @@ io.on("connection", (socket) => {
 
   // When a user sends a message
   socket.on("send_message", ({ message, room }) => {
-    const timestamp = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    // Broadcast to everyone in the room (including sender)
     io.to(room).emit("receive_message", {
       username: socket.username,
       message,
-      timestamp,
       senderId: socket.id,
     });
   });
