@@ -8,7 +8,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ["polling", "websocket"],
-  allowEIO3: true
+  allowEIO3: true,
+  maxHttpBufferSize: 5e6 // 5MB — allows image transfer
 });
 
 // Serve static files with correct MIME types
@@ -51,6 +52,29 @@ io.on("connection", (socket) => {
 
     // Push updated count to EVERYONE in the room
     io.to(room).emit("update_count", { userCount: rooms[room].length });
+  });
+
+  // When a user sends an image
+  socket.on("send_image", ({ imageData, room }) => {
+    const timestamp = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    io.to(room).emit("receive_image", {
+      username: socket.username,
+      imageData,
+      timestamp,
+      senderId: socket.id,
+    });
+  });
+
+  // Typing indicators
+  socket.on("typing_start", ({ room }) => {
+    socket.to(room).emit("user_typing", { username: socket.username });
+  });
+
+  socket.on("typing_stop", ({ room }) => {
+    socket.to(room).emit("user_stopped_typing", { username: socket.username });
   });
 
   // When a user sends a message

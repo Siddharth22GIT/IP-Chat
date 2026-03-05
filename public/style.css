@@ -20,6 +20,7 @@
 
 html, body {
   height: 100%;
+  height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
@@ -30,6 +31,12 @@ html, body {
 /* ── SCREENS ── */
 .screen { display: none; height: 100dvh; width: 100%; }
 .screen.active { display: flex; }
+
+/* Fix for mobile keyboard pushing layout */
+#chat-screen {
+  height: 100dvh;
+  max-height: -webkit-fill-available;
+}
 
 /* ────────────────────────────
    JOIN SCREEN
@@ -181,6 +188,7 @@ html, body {
   box-shadow: none !important;
 }
 
+.error-msg {
   color: var(--red);
   font-size: 12px;
   margin-top: 12px;
@@ -308,7 +316,9 @@ html, body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .chat-header {
@@ -551,4 +561,149 @@ html, body {
   .chat-main { width: 100%; }
 
   .msg { max-width: 88%; }
+
+  /* Keep input bar always visible above keyboard */
+  .input-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    padding: 10px 14px;
+  }
+
+  /* Reduce header height on mobile to give more space to messages */
+  .chat-header {
+    height: 50px;
+    padding: 0 12px;
+  }
+
+  /* Tighter message padding on mobile */
+  .messages-area {
+    padding: 12px 14px;
+  }
+
+  /* Mobile image size — slightly smaller to fit screen */
+  .msg-image {
+    max-width: 200px;
+    max-height: 160px;
+  }
+}
+
+/* IMAGE BUTTON & IMAGE MESSAGES */
+.image-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  color: var(--accent);
+  border: 1px solid var(--border2);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.image-btn:hover {
+  background: var(--border2);
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(0,229,255,0.2);
+}
+
+/* PC — comfortable chat bubble size */
+.msg-image {
+  max-width: 280px;
+  max-height: 200px;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  cursor: pointer;
+  display: block;
+  object-fit: cover;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.msg-image:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.img-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.img-overlay img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 10px;
+  box-shadow: 0 0 60px rgba(0,0,0,0.8);
+}
+
+.uploading-indicator {
+  font-size: 12px;
+  color: var(--accent);
+  padding: 6px 14px;
+  background: var(--surface2);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  align-self: center;
+  animation: blink 1s infinite;
+}
+
+/* TYPING INDICATOR */
+.typing-indicator {
+  min-height: 28px;
+  padding: 0 24px 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+}
+
+.typing-indicator:empty { min-height: 0; padding: 0; }
+
+.typing-name {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: typingBounce 1.2s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: 0s; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-5px); opacity: 1; }
 }
