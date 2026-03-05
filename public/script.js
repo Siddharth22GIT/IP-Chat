@@ -45,6 +45,19 @@ socket.on("disconnect", (reason) => {
 });
 
 
+// ── Mobile keyboard fix ──
+// When soft keyboard opens on mobile, resize the chat area to fit
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => {
+    const chatScreen = document.getElementById("chat-screen");
+    if (chatScreen) {
+      chatScreen.style.height = window.visualViewport.height + "px";
+    }
+    // Always scroll to bottom when keyboard opens
+    scrollToBottom();
+  });
+}
+
 // ── Wake up server before anything else ──
 async function wakeServer() {
   const statusEl = document.getElementById("wake-status");
