@@ -11,10 +11,16 @@ const io = new Server(server, {
   allowEIO3: true
 });
 
-// Serve static files from the "public" folder
-app.use(express.static(path.join(__dirname, "public")));
+// Serve static files with correct MIME types
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".css")) res.setHeader("Content-Type", "text/css");
+    if (filePath.endsWith(".js"))  res.setHeader("Content-Type", "application/javascript");
+  }
+}));
 
-// Track users per room: { roomId: [{ id, username }] }
+// Health check — keeps the server alive and confirms it's running
+app.get("/ping", (req, res) => res.json({ status: "ok" }));
 const rooms = {};
 
 io.on("connection", (socket) => {
