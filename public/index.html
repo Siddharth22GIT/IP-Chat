@@ -5,65 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IPChat — Room-Based Messenger</title>
     <link rel="stylesheet" href="style.css" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <!-- ── JOIN SCREEN ── -->
+    <!-- JOIN SCREEN -->
     <div id="join-screen" class="screen active">
       <div class="join-card">
         <div class="join-logo">
           <span class="logo-bracket">[</span>
-          <span class="logo-text">IP</span
-          ><span class="logo-text accent">CHAT</span>
+          <span class="logo-text">IP</span><span class="logo-text accent">CHAT</span>
           <span class="logo-bracket">]</span>
         </div>
-        <p class="join-subtitle">
-          Enter a shared IP address to join the same room
-        </p>
-
+        <p class="join-subtitle">Enter a shared IP address to join the same room</p>
         <div class="form-group">
           <label for="username-input">USERNAME</label>
-          <input
-            id="username-input"
-            type="text"
-            placeholder="e.g. alice"
-            maxlength="20"
-            autocomplete="off"
-          />
+          <input id="username-input" type="text" placeholder="e.g. alice" maxlength="20" autocomplete="off" />
         </div>
-
         <div class="form-group">
           <label for="ip-input">IP ADDRESS (ROOM CODE)</label>
-          <input
-            id="ip-input"
-            type="text"
-            placeholder="e.g. 192.168.1.1"
-            autocomplete="off"
-          />
-          <span class="field-hint">
-            Anyone who enters the same IP will share this room
-          </span>
+          <input id="ip-input" type="text" placeholder="e.g. 192.168.1.1" autocomplete="off" />
+          <span class="field-hint">Anyone who enters the same IP will share this room</span>
         </div>
-
         <button id="join-btn" class="join-btn">
           <span>CONNECT</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M5 12h14M12 5l7 7-7 7"/>
           </svg>
         </button>
-
         <p id="join-error" class="error-msg"></p>
         <p id="wake-status" class="wake-status"></p>
       </div>
       <div class="bg-grid"></div>
     </div>
 
-    <!-- ── CHAT SCREEN ── -->
+    <!-- CHAT SCREEN -->
     <div id="chat-screen" class="screen">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-logo">
           <span class="logo-bracket">[</span>IP<span class="accent">CHAT</span><span class="logo-bracket">]</span>
@@ -83,7 +59,6 @@
         <button id="leave-btn" class="leave-btn">← Leave Room</button>
       </aside>
 
-      <!-- Main chat -->
       <main class="chat-main">
         <header class="chat-header">
           <button id="menu-toggle" class="menu-toggle" aria-label="Toggle sidebar">☰</button>
@@ -96,31 +71,29 @@
         </header>
 
         <div id="messages" class="messages-area">
-          <div class="welcome-msg">
-            <span>— Start of conversation —</span>
-          </div>
+          <div class="welcome-msg"><span>— Start of conversation —</span></div>
         </div>
 
-        <!-- Typing indicator -->
         <div id="typing-indicator" class="typing-indicator"></div>
 
+        <!-- Reply preview bar -->
+        <div id="reply-preview" class="reply-preview">
+          <div class="reply-preview-inner">
+            <span class="reply-icon">↩</span>
+            <span id="reply-text" class="reply-preview-text"></span>
+          </div>
+          <button id="reply-cancel" class="reply-cancel-btn" aria-label="Cancel reply">✕</button>
+        </div>
+
         <div class="input-bar">
-          <!-- Hidden file input -->
           <input type="file" id="image-input" accept="image/*" style="display:none" />
-          <!-- Image button -->
           <button id="image-btn" class="image-btn" aria-label="Send image" title="Send image">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
               <path d="M21 15l-5-5L5 21"/>
             </svg>
           </button>
-          <input
-            id="message-input"
-            type="text"
-            placeholder="Type a message…"
-            maxlength="500"
-            autocomplete="off"
-          />
+          <input id="message-input" type="text" placeholder="Type a message…" maxlength="500" autocomplete="off" />
           <button id="send-btn" class="send-btn" aria-label="Send">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>

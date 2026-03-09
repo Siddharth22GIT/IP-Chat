@@ -10,7 +10,8 @@ const socket = io({
 // ── State ──
 let myUsername = "";
 let myRoom = "";
-let cryptoKey = null; // AES-GCM key derived from IP
+let cryptoKey = null;
+let replyingTo = null; // { username, message, isImage }
 
 // ── DOM references ──
 const joinScreen      = document.getElementById("join-screen");
@@ -33,6 +34,9 @@ const imageBtn        = document.getElementById("image-btn");
 const imageInput      = document.getElementById("image-input");
 const menuToggle      = document.getElementById("menu-toggle");
 const sidebar         = document.querySelector(".sidebar");
+const replyPreview    = document.getElementById("reply-preview");
+const replyText       = document.getElementById("reply-text");
+const replyCancelBtn  = document.getElementById("reply-cancel");
 
 // ── Connection status ──
 socket.on("connect", () => { console.log("✅ Connected:", socket.id); });
@@ -64,63 +68,36 @@ async function wakeServer() {
 joinBtn.disabled = true;
 wakeServer();
 
-// ────────────────────────────────────────
-// E2E ENCRYPTION — Web Crypto API (AES-GCM)
-// ────────────────────────────────────────
-
-// Derive a 256-bit AES key from the IP address string
+// ── E2E ENCRYPTION ──
 async function deriveKeyFromIP(ip) {
   const encoder = new TextEncoder();
-  // Import IP as raw key material
   const keyMaterial = await window.crypto.subtle.importKey(
-    "raw",
-    encoder.encode(ip),
-    { name: "PBKDF2" },
-    false,
-    ["deriveKey"]
+    "raw", encoder.encode(ip), { name: "PBKDF2" }, false, ["deriveKey"]
   );
-  // Derive a strong AES-GCM key using PBKDF2
   return window.crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: encoder.encode("ipchat-salt-v1"), // fixed salt
-      iterations: 100000,
-      hash: "SHA-256"
-    },
+    { name: "PBKDF2", salt: encoder.encode("ipchat-salt-v1"), iterations: 100000, hash: "SHA-256" },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
+    false, ["encrypt", "decrypt"]
   );
 }
 
-// Encrypt a string — returns base64 string of IV + ciphertext
 async function encryptText(plainText) {
   const encoder = new TextEncoder();
-  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // random IV
-  const encrypted = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    cryptoKey,
-    encoder.encode(plainText)
-  );
-  // Combine IV + ciphertext and encode as base64
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, cryptoKey, encoder.encode(plainText));
   const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(encrypted), iv.byteLength);
   return btoa(String.fromCharCode(...combined));
 }
 
-// Decrypt a base64 string — returns original plain text
 async function decryptText(base64) {
   try {
     const combined = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
     const iv = combined.slice(0, 12);
     const ciphertext = combined.slice(12);
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      cryptoKey,
-      ciphertext
-    );
+    const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, cryptoKey, ciphertext);
     return new TextDecoder().decode(decrypted);
   } catch {
     return "🔒 Unable to decrypt message";
@@ -143,11 +120,8 @@ async function joinRoom() {
   if (!ip) { showError("Please enter an IP address."); ipInput.focus(); return; }
   if (!isValidIP(ip)) { showError("That doesn't look like a valid IP address."); ipInput.focus(); return; }
 
-  // Disable button and show generating key status
   joinBtn.disabled = true;
   joinBtn.querySelector("span").textContent = "SECURING...";
-
-  // Derive encryption key from IP before joining
   cryptoKey = await deriveKeyFromIP(ip);
 
   myUsername = username;
@@ -176,19 +150,48 @@ joinBtn.addEventListener("click", joinRoom);
 usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
 ipInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
 
+// ── REPLY SYSTEM ──
+function setReply(username, message, isImage = false) {
+  replyingTo = { username, message, isImage };
+  replyText.textContent = isImage ? `📷 ${username}: [Image]` : `${username}: ${message.slice(0, 60)}${message.length > 60 ? "…" : ""}`;
+  replyPreview.classList.add("active");
+  messageInput.focus();
+  scrollToBottom();
+}
+
+function cancelReply() {
+  replyingTo = null;
+  replyPreview.classList.remove("active");
+}
+
+replyCancelBtn.addEventListener("click", cancelReply);
+
 // ── SEND MESSAGE ──
 async function sendMessage() {
   const text = messageInput.value.trim();
   if (!text) return;
   stopTyping();
-  const encrypted = await encryptText(text);
-  socket.emit("send_message", { message: encrypted, room: myRoom });
+
+  const payload = {
+    message: await encryptText(text),
+    room: myRoom,
+    reply: replyingTo ? {
+      username: replyingTo.username,
+      message: await encryptText(replyingTo.isImage ? "[Image]" : replyingTo.message),
+      isImage: replyingTo.isImage
+    } : null
+  };
+
+  socket.emit("send_message", payload);
   messageInput.value = "";
+  cancelReply();
   messageInput.focus();
 }
+
 sendBtn.addEventListener("click", sendMessage);
 messageInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === "Escape") cancelReply();
 });
 
 // ── SEND IMAGE ──
@@ -210,10 +213,19 @@ imageInput.addEventListener("change", async () => {
 
   const reader = new FileReader();
   reader.onload = async (e) => {
-    const encrypted = await encryptText(e.target.result); // encrypt base64 image
-    socket.emit("send_image", { imageData: encrypted, room: myRoom });
+    const payload = {
+      imageData: await encryptText(e.target.result),
+      room: myRoom,
+      reply: replyingTo ? {
+        username: replyingTo.username,
+        message: await encryptText(replyingTo.isImage ? "[Image]" : replyingTo.message),
+        isImage: replyingTo.isImage
+      } : null
+    };
+    socket.emit("send_image", payload);
     indicator.remove();
     imageInput.value = "";
+    cancelReply();
   };
   reader.readAsDataURL(file);
 });
@@ -231,34 +243,17 @@ const typingUsers = {};
 
 messageInput.addEventListener("input", () => {
   if (!myRoom) return;
-  if (!isTyping) {
-    isTyping = true;
-    socket.emit("typing_start", { room: myRoom });
-  }
+  if (!isTyping) { isTyping = true; socket.emit("typing_start", { room: myRoom }); }
   clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(() => {
-    isTyping = false;
-    socket.emit("typing_stop", { room: myRoom });
-  }, 1500);
+  typingTimeout = setTimeout(() => { isTyping = false; socket.emit("typing_stop", { room: myRoom }); }, 1500);
 });
 
 function stopTyping() {
-  if (isTyping) {
-    isTyping = false;
-    clearTimeout(typingTimeout);
-    socket.emit("typing_stop", { room: myRoom });
-  }
+  if (isTyping) { isTyping = false; clearTimeout(typingTimeout); socket.emit("typing_stop", { room: myRoom }); }
 }
 
-socket.on("user_typing", ({ username }) => {
-  typingUsers[username] = true;
-  renderTypingIndicator();
-});
-
-socket.on("user_stopped_typing", ({ username }) => {
-  delete typingUsers[username];
-  renderTypingIndicator();
-});
+socket.on("user_typing", ({ username }) => { typingUsers[username] = true; renderTypingIndicator(); });
+socket.on("user_stopped_typing", ({ username }) => { delete typingUsers[username]; renderTypingIndicator(); });
 
 function renderTypingIndicator() {
   const names = Object.keys(typingUsers);
@@ -274,15 +269,14 @@ function renderTypingIndicator() {
 
 // ── CLEAR CHAT ──
 clearBtn.addEventListener("click", () => {
-  if (confirm("Clear the chat for everyone in this room?")) {
-    socket.emit("clear_chat", { room: myRoom });
-  }
+  if (confirm("Clear the chat for everyone in this room?")) socket.emit("clear_chat", { room: myRoom });
 });
 socket.on("chat_cleared", ({ clearedBy }) => {
   messagesArea.innerHTML = `<div class="welcome-msg"><span>— Start of conversation —</span></div>`;
   appendSystemMessage(`${clearedBy} cleared the chat`);
   Object.keys(typingUsers).forEach(k => delete typingUsers[k]);
   renderTypingIndicator();
+  cancelReply();
 });
 
 // ── LEAVE ROOM ──
@@ -291,20 +285,29 @@ leaveBtn.addEventListener("click", () => location.reload());
 // ── MOBILE SIDEBAR ──
 menuToggle.addEventListener("click", () => sidebar.classList.toggle("open"));
 document.addEventListener("click", (e) => {
-  if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== menuToggle) {
+  if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== menuToggle)
     sidebar.classList.remove("open");
-  }
 });
 
 // ── SOCKET EVENTS ──
-socket.on("receive_message", async ({ username, message, senderId }) => {
+socket.on("receive_message", async ({ username, message, senderId, reply }) => {
   const decrypted = await decryptText(message);
-  appendMessage({ username, message: decrypted, timestamp: getTimestamp(), isSelf: senderId === socket.id });
+  const decryptedReply = reply ? {
+    username: reply.username,
+    message: await decryptText(reply.message),
+    isImage: reply.isImage
+  } : null;
+  appendMessage({ username, message: decrypted, timestamp: getTimestamp(), isSelf: senderId === socket.id, reply: decryptedReply });
 });
 
-socket.on("receive_image", async ({ username, imageData, senderId }) => {
+socket.on("receive_image", async ({ username, imageData, senderId, reply }) => {
   const decrypted = await decryptText(imageData);
-  appendImage({ username, imageData: decrypted, timestamp: getTimestamp(), isSelf: senderId === socket.id });
+  const decryptedReply = reply ? {
+    username: reply.username,
+    message: await decryptText(reply.message),
+    isImage: reply.isImage
+  } : null;
+  appendImage({ username, imageData: decrypted, timestamp: getTimestamp(), isSelf: senderId === socket.id, reply: decryptedReply });
 });
 
 socket.on("user_joined", ({ message }) => appendSystemMessage(message));
@@ -313,7 +316,17 @@ socket.on("room_info", ({ userCount: count }) => { userCount.textContent = count
 socket.on("update_count", ({ userCount: count }) => { userCount.textContent = count; });
 
 // ── HELPERS ──
-function appendMessage({ username, message, timestamp, isSelf }) {
+function buildReplyBlock(reply) {
+  if (!reply) return "";
+  return `
+    <div class="reply-block">
+      <span class="reply-author">${escapeHtml(reply.username)}</span>
+      <span class="reply-content">${reply.isImage ? "📷 Image" : escapeHtml(reply.message.slice(0, 80))}${(!reply.isImage && reply.message.length > 80) ? "…" : ""}</span>
+    </div>
+  `;
+}
+
+function appendMessage({ username, message, timestamp, isSelf, reply }) {
   const div = document.createElement("div");
   div.className = `msg ${isSelf ? "self" : "other"}`;
   div.innerHTML = `
@@ -321,13 +334,18 @@ function appendMessage({ username, message, timestamp, isSelf }) {
       <span class="msg-author">${escapeHtml(username)}</span>
       <span class="msg-time">${timestamp}</span>
     </div>
-    <div class="msg-bubble">${escapeHtml(message)}</div>
+    <div class="msg-bubble">
+      ${buildReplyBlock(reply)}
+      ${escapeHtml(message)}
+    </div>
   `;
+  // Double click to reply
+  div.addEventListener("dblclick", () => setReply(username, message, false));
   messagesArea.appendChild(div);
   scrollToBottom();
 }
 
-function appendImage({ username, imageData, timestamp, isSelf }) {
+function appendImage({ username, imageData, timestamp, isSelf, reply }) {
   const div = document.createElement("div");
   div.className = `msg ${isSelf ? "self" : "other"}`;
   div.innerHTML = `
@@ -336,10 +354,13 @@ function appendImage({ username, imageData, timestamp, isSelf }) {
       <span class="msg-time">${timestamp}</span>
     </div>
     <div class="msg-bubble" style="padding:6px;background:transparent;border:none;">
+      ${buildReplyBlock(reply)}
       <img src="${imageData}" class="msg-image" alt="Image" />
     </div>
   `;
   div.querySelector(".msg-image").addEventListener("click", (e) => openImageOverlay(e.target.src));
+  // Double click to reply
+  div.addEventListener("dblclick", () => setReply(username, "", true));
   messagesArea.appendChild(div);
   scrollToBottom();
 }
@@ -360,9 +381,7 @@ function appendSystemMessage(text) {
   scrollToBottom();
 }
 
-function scrollToBottom() {
-  messagesArea.scrollTop = messagesArea.scrollHeight;
-}
+function scrollToBottom() { messagesArea.scrollTop = messagesArea.scrollHeight; }
 
 function escapeHtml(str) {
   return str

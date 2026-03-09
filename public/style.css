@@ -707,3 +707,203 @@ html, body {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
   30%            { transform: translateY(-5px); opacity: 1; }
 }
+
+/* ── REPLY BAR (above input) ── */
+.reply-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 20px;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  animation: slideUp 0.15s ease;
+}
+
+.reply-bar.active { display: flex; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.reply-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reply-bar-inner svg { flex-shrink: 0; color: var(--accent); }
+
+.reply-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-mid);
+}
+
+.reply-author {
+  color: var(--accent);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.reply-cancel {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s;
+}
+
+.reply-cancel:hover { color: var(--red); background: rgba(255,94,122,0.08); }
+
+/* ── REPLY QUOTE inside message bubble ── */
+.reply-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+  background: rgba(0,0,0,0.2);
+  font-size: 12px;
+  cursor: default;
+}
+
+.msg.self .reply-quote { border-left-color: rgba(255,255,255,0.4); background: rgba(0,0,0,0.15); }
+
+.reply-quote-author {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.msg.self .reply-quote-author { color: rgba(255,255,255,0.8); }
+
+.reply-quote-text {
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg.self .reply-quote-text { color: rgba(255,255,255,0.6); }
+
+/* Double click hint on hover */
+.msg:hover .msg-bubble { cursor: pointer; }
+
+/* ── REPLY PREVIEW BAR (above input) ── */
+.reply-preview {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: var(--surface2);
+  border-top: 1px solid var(--border2);
+  border-left: 3px solid var(--accent);
+  gap: 10px;
+  animation: slideUp 0.15s ease;
+}
+
+.reply-preview.active { display: flex; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.reply-preview-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reply-icon {
+  color: var(--accent);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.reply-preview-text {
+  font-size: 12px;
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reply-cancel-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.reply-cancel-btn:hover {
+  color: var(--red);
+  background: rgba(255,94,122,0.1);
+}
+
+/* ── REPLY BLOCK inside message bubble ── */
+.reply-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  border-left: 3px solid rgba(255,255,255,0.3);
+  background: rgba(0,0,0,0.2);
+  font-size: 12px;
+  cursor: default;
+}
+
+.msg.self .reply-block {
+  border-left-color: rgba(255,255,255,0.4);
+  background: rgba(0,0,0,0.2);
+}
+
+.msg.other .reply-block {
+  border-left-color: var(--accent);
+  background: rgba(0,229,255,0.05);
+}
+
+.reply-author {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.msg.self .reply-author { color: rgba(255,255,255,0.7); }
+.msg.other .reply-author { color: var(--accent); }
+
+.reply-content {
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Double click hint */
+.msg:hover .msg-bubble {
+  cursor: pointer;
+}
