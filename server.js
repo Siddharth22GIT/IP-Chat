@@ -22,6 +22,12 @@ app.use(express.static(path.join(__dirname, "public"), {
 app.get("/ping", (req, res) => res.json({ status: "ok" }));
 const rooms = {};
 
+function broadcastMembers(room) {
+  if (!rooms[room]) return;
+  const members = rooms[room].map(u => ({ id: u.id, username: u.username }));
+  io.to(room).emit("members_update", { members });
+}
+
 io.on("connection", (socket) => {
   console.log(`🔌 New connection: ${socket.id}`);
 
@@ -34,15 +40,12 @@ io.on("connection", (socket) => {
     console.log(`👤 ${username} joined room: ${room}`);
     socket.to(room).emit("user_joined", { message: `${username} joined the room` });
     socket.emit("room_info", { userCount: rooms[room].length, room });
-    io.to(room).emit("update_count", { userCount: rooms[room].length });
+    broadcastMembers(room);
   });
 
   socket.on("send_image", ({ imageData, room, reply }) => {
     io.to(room).emit("receive_image", {
-      username: socket.username,
-      imageData,
-      senderId: socket.id,
-      reply: reply || null
+      username: socket.username, imageData, senderId: socket.id, reply: reply || null
     });
   });
 
@@ -56,10 +59,7 @@ io.on("connection", (socket) => {
 
   socket.on("send_message", ({ message, room, reply }) => {
     io.to(room).emit("receive_message", {
-      username: socket.username,
-      message,
-      senderId: socket.id,
-      reply: reply || null
+      username: socket.username, message, senderId: socket.id, reply: reply || null
     });
   });
 
@@ -72,7 +72,7 @@ io.on("connection", (socket) => {
     if (room && rooms[room]) {
       rooms[room] = rooms[room].filter((u) => u.id !== socket.id);
       socket.to(room).emit("user_left", { message: `${username} left the room` });
-      io.to(room).emit("update_count", { userCount: rooms[room].length });
+      broadcastMembers(room);
       if (rooms[room].length === 0) delete rooms[room];
     }
     console.log(`❌ Disconnected: ${username || socket.id}`);

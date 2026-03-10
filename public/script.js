@@ -11,7 +11,7 @@ const socket = io({
 let myUsername = "";
 let myRoom = "";
 let cryptoKey = null;
-let replyingTo = null; // { username, message, isImage }
+let replyingTo = null;
 
 // ── DOM references ──
 const joinScreen      = document.getElementById("join-screen");
@@ -27,7 +27,6 @@ const leaveBtn        = document.getElementById("leave-btn");
 const roomDisplay     = document.getElementById("room-display");
 const headerIp        = document.getElementById("header-ip");
 const headerUsername  = document.getElementById("header-username");
-const sidebarUsername = document.getElementById("sidebar-username");
 const userCount       = document.getElementById("user-count");
 const clearBtn        = document.getElementById("clear-btn");
 const imageBtn        = document.getElementById("image-btn");
@@ -37,6 +36,7 @@ const sidebar         = document.querySelector(".sidebar");
 const replyPreview    = document.getElementById("reply-preview");
 const replyText       = document.getElementById("reply-text");
 const replyCancelBtn  = document.getElementById("reply-cancel");
+const membersList     = document.getElementById("members-list");
 
 // ── Connection status ──
 socket.on("connect", () => { console.log("✅ Connected:", socket.id); });
@@ -76,9 +76,7 @@ async function deriveKeyFromIP(ip) {
   );
   return window.crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: encoder.encode("ipchat-salt-v1"), iterations: 100000, hash: "SHA-256" },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false, ["encrypt", "decrypt"]
+    keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
   );
 }
 
@@ -99,17 +97,13 @@ async function decryptText(base64) {
     const ciphertext = combined.slice(12);
     const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, cryptoKey, ciphertext);
     return new TextDecoder().decode(decrypted);
-  } catch {
-    return "🔒 Unable to decrypt message";
-  }
+  } catch { return "🔒 Unable to decrypt message"; }
 }
 
 // ── Validate IP ──
 function isValidIP(value) {
   const trimmed = value.trim();
-  const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
-  const ipv6 = /^[0-9a-fA-F:]{3,}$/;
-  return ipv4.test(trimmed) || ipv6.test(trimmed);
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(trimmed) || /^[0-9a-fA-F:]{3,}$/.test(trimmed);
 }
 
 // ── JOIN ──
@@ -133,7 +127,6 @@ async function joinRoom() {
   roomDisplay.textContent = myRoom;
   headerIp.textContent = myRoom;
   headerUsername.textContent = myUsername;
-  sidebarUsername.textContent = myUsername;
   messageInput.focus();
 }
 
@@ -149,6 +142,23 @@ function showError(msg) {
 joinBtn.addEventListener("click", joinRoom);
 usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
 ipInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
+
+// ── MEMBERS LIST ──
+socket.on("members_update", ({ members }) => {
+  userCount.textContent = members.length;
+  membersList.innerHTML = "";
+  members.forEach(({ id, username }) => {
+    const isMe = id === socket.id;
+    const item = document.createElement("div");
+    item.className = `member-item${isMe ? " member-me" : ""}`;
+    item.innerHTML = `
+      <span class="member-dot"></span>
+      <span class="member-name">${escapeHtml(username)}</span>
+      ${isMe ? '<span class="member-you-tag">you</span>' : ""}
+    `;
+    membersList.appendChild(item);
+  });
+});
 
 // ── REPLY SYSTEM ──
 function setReply(username, message, isImage = false) {
@@ -171,7 +181,6 @@ async function sendMessage() {
   const text = messageInput.value.trim();
   if (!text) return;
   stopTyping();
-
   const payload = {
     message: await encryptText(text),
     room: myRoom,
@@ -181,7 +190,6 @@ async function sendMessage() {
       isImage: replyingTo.isImage
     } : null
   };
-
   socket.emit("send_message", payload);
   messageInput.value = "";
   cancelReply();
@@ -200,17 +208,12 @@ imageBtn.addEventListener("click", () => imageInput.click());
 imageInput.addEventListener("change", async () => {
   const file = imageInput.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    alert("Image too large! Please choose an image under 2MB.");
-    imageInput.value = "";
-    return;
-  }
+  if (file.size > 2 * 1024 * 1024) { alert("Image too large! Please choose an image under 2MB."); imageInput.value = ""; return; }
   const indicator = document.createElement("div");
   indicator.className = "uploading-indicator";
   indicator.textContent = "Encrypting & sending...";
   messagesArea.appendChild(indicator);
   scrollToBottom();
-
   const reader = new FileReader();
   reader.onload = async (e) => {
     const payload = {
@@ -292,28 +295,18 @@ document.addEventListener("click", (e) => {
 // ── SOCKET EVENTS ──
 socket.on("receive_message", async ({ username, message, senderId, reply }) => {
   const decrypted = await decryptText(message);
-  const decryptedReply = reply ? {
-    username: reply.username,
-    message: await decryptText(reply.message),
-    isImage: reply.isImage
-  } : null;
+  const decryptedReply = reply ? { username: reply.username, message: await decryptText(reply.message), isImage: reply.isImage } : null;
   appendMessage({ username, message: decrypted, timestamp: getTimestamp(), isSelf: senderId === socket.id, reply: decryptedReply });
 });
 
 socket.on("receive_image", async ({ username, imageData, senderId, reply }) => {
   const decrypted = await decryptText(imageData);
-  const decryptedReply = reply ? {
-    username: reply.username,
-    message: await decryptText(reply.message),
-    isImage: reply.isImage
-  } : null;
+  const decryptedReply = reply ? { username: reply.username, message: await decryptText(reply.message), isImage: reply.isImage } : null;
   appendImage({ username, imageData: decrypted, timestamp: getTimestamp(), isSelf: senderId === socket.id, reply: decryptedReply });
 });
 
 socket.on("user_joined", ({ message }) => appendSystemMessage(message));
 socket.on("user_left", ({ message }) => appendSystemMessage(message));
-socket.on("room_info", ({ userCount: count }) => { userCount.textContent = count; });
-socket.on("update_count", ({ userCount: count }) => { userCount.textContent = count; });
 
 // ── HELPERS ──
 function buildReplyBlock(reply) {
@@ -322,8 +315,7 @@ function buildReplyBlock(reply) {
     <div class="reply-block">
       <span class="reply-author">${escapeHtml(reply.username)}</span>
       <span class="reply-content">${reply.isImage ? "📷 Image" : escapeHtml(reply.message.slice(0, 80))}${(!reply.isImage && reply.message.length > 80) ? "…" : ""}</span>
-    </div>
-  `;
+    </div>`;
 }
 
 function appendMessage({ username, message, timestamp, isSelf, reply }) {
@@ -334,12 +326,7 @@ function appendMessage({ username, message, timestamp, isSelf, reply }) {
       <span class="msg-author">${escapeHtml(username)}</span>
       <span class="msg-time">${timestamp}</span>
     </div>
-    <div class="msg-bubble">
-      ${buildReplyBlock(reply)}
-      ${escapeHtml(message)}
-    </div>
-  `;
-  // Double click to reply
+    <div class="msg-bubble">${buildReplyBlock(reply)}${escapeHtml(message)}</div>`;
   div.addEventListener("dblclick", () => setReply(username, message, false));
   messagesArea.appendChild(div);
   scrollToBottom();
@@ -356,10 +343,8 @@ function appendImage({ username, imageData, timestamp, isSelf, reply }) {
     <div class="msg-bubble" style="padding:6px;background:transparent;border:none;">
       ${buildReplyBlock(reply)}
       <img src="${imageData}" class="msg-image" alt="Image" />
-    </div>
-  `;
+    </div>`;
   div.querySelector(".msg-image").addEventListener("click", (e) => openImageOverlay(e.target.src));
-  // Double click to reply
   div.addEventListener("dblclick", () => setReply(username, "", true));
   messagesArea.appendChild(div);
   scrollToBottom();
@@ -384,10 +369,5 @@ function appendSystemMessage(text) {
 function scrollToBottom() { messagesArea.scrollTop = messagesArea.scrollHeight; }
 
 function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
